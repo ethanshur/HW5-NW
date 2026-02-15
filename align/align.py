@@ -100,8 +100,6 @@ class NeedlemanWunsch:
 
     def align(self, seqA: str, seqB: str) -> Tuple[float, str, str]:
         """
-        TODO
-        
         This function performs global sequence alignment of two strings
         using the Needleman-Wunsch Algorithm
         
@@ -126,20 +124,49 @@ class NeedlemanWunsch:
         self._seqA = seqA
         self._seqB = seqB
         
-        # TODO: Initialize matrix private attributes for use in alignment
         # create matrices for alignment scores, gaps, and backtracing
-        pass
+        n = len(seqA)
+        m = len(seqB)
 
-        
-        # TODO: Implement global alignment here
-        pass      		
-        		    
+        # Initialize backtrace and alignment matrices
+        self._align_matrix = np.full((n + 1, m + 1), -np.inf, dtype=float)
+        self._back = np.full((n + 1, m + 1), -1, dtype=int)
+
+        # Populate default entries in matrices
+        self._align_matrix[0, 0] = 0
+        for i in range(1, n + 1):
+            self._align_matrix[i, 0] = i*self.gap_open
+            self._back[i, 0] = 1  # (gap in B)
+
+        for j in range(1, m + 1):
+            self._align_matrix[0, j] = j*self.gap_open
+            self._back[0, j] = 2  # (gap in A)
+
+        # Construct alignment matrix
+        for i in range(1, n + 1):
+            for j in range(1, m + 1):
+                a = seqA[i - 1]
+                b = seqB[j - 1]
+
+                # Retrieve BLOSUM scores of sequence entries
+                score_sub = self.sub_dict.get((a, b))
+
+                # Different potential directions
+                diag = self._align_matrix[i - 1, j - 1] + score_sub
+                up = self._align_matrix[i - 1, j] + self.gap_open
+                left = self._align_matrix[i, j - 1] + self.gap_open
+
+                # Retrieve index of best score
+                temp = np.array([diag, up, left], dtype=float)
+                move = int(temp.argmax())
+                self._back[i, j] = move
+                self._align_matrix[i, j] = temp[move]
+
+        self.alignment_score = float(self._align_matrix[n, m])
         return self._backtrace()
 
     def _backtrace(self) -> Tuple[float, str, str]:
         """
-        TODO
-        
         This function traces back through the back matrix created with the
         align function in order to return the final alignment score and strings.
         
@@ -150,7 +177,35 @@ class NeedlemanWunsch:
          	(alignment score, seqA alignment, seqB alignment) : Tuple[float, str, str]
          		the score and corresponding strings for the alignment of seqA and seqB
         """
-        pass
+        i = len(self._seqA)
+        j = len(self._seqB)
+
+        a_out = []
+        b_out = []
+
+        while i > 0 or j > 0:
+            move = self._back[i, j]
+
+            # Diagonal. Both sequences included
+            if i > 0 and j > 0 and move == 0:
+                a_out.append(self._seqA[i-1])
+                b_out.append(self._seqB[j - 1])
+                i -=1
+                j -=1
+
+            # Up
+            elif i > 0 and (j == 0 or move == 1):
+                a_out.append(self._seqA[i-1])
+                b_out.append("-")
+                i-=1
+
+            # Left
+            else:
+                a_out.append("-")
+                b_out.append(self._seqB[j-1])
+                j-=1
+        self.seqA_align = ''.join(reversed(a_out))
+        self.seqB_align = ''.join(reversed(b_out))
 
         return (self.alignment_score, self.seqA_align, self.seqB_align)
 
